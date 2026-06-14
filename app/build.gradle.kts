@@ -14,15 +14,26 @@ android {
         applicationId = "com.prplegryn.quizcat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("quizcatDebug") {
+            storeFile = file("keystore/quizcat-debug.keystore")
+            storePassword = "quizcatdebug"
+            keyAlias = "quizcatdebug"
+            keyPassword = "quizcatdebug"
+            storeType = "JKS"
+        }
     }
 
     buildTypes {
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("quizcatDebug")
         }
         release {
             isMinifyEnabled = false
