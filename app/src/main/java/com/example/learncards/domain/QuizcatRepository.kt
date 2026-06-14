@@ -537,7 +537,7 @@ class QuizcatRepository(
 
     private fun evaluate(card: CardEntity, action: AnswerAction, value: String): Evaluation {
         if (action == AnswerAction.Skip) {
-            return Evaluation(correct = false, skipped = true, feedback = skipTips(card), result = FirstAnswerResult.Skip)
+            return Evaluation(correct = false, skipped = true, feedback = wrongFeedback(card), result = FirstAnswerResult.Skip)
         }
         return when (card.type) {
             CardType.FlashCard -> {
@@ -561,11 +561,11 @@ class QuizcatRepository(
             }
             CardType.Cloze -> {
                 val content = json.decodeFromString<ClozeContent>(card.contentJson)
-                strictTextEvaluation(value, content.fillAnswer, content.wrongTips, content.skipTips)
+                strictTextEvaluation(value, content.fillAnswer, content.wrongTips)
             }
             CardType.TypedAnswer -> {
                 val content = json.decodeFromString<TypedAnswerContent>(card.contentJson)
-                strictTextEvaluation(value, content.answer, content.wrongTips, content.skipTips, content.rightTips)
+                strictTextEvaluation(value, content.answer, content.wrongTips, content.rightTips)
             }
             else -> Evaluation(false, skipped = false, feedback = "", result = FirstAnswerResult.Wrong)
         }
@@ -575,7 +575,6 @@ class QuizcatRepository(
         rawInput: String,
         answer: String,
         wrongTips: String,
-        skipTips: String,
         rightTips: String = "回答正确。",
     ): Evaluation {
         val input = rawInput.trim()
@@ -588,16 +587,16 @@ class QuizcatRepository(
                 feedback = DefaultTips.CaseMismatch,
                 result = FirstAnswerResult.Wrong,
             )
-            else -> Evaluation(false, skipped = false, feedback = wrongTips.ifBlank { skipTips }, result = FirstAnswerResult.Wrong)
+            else -> Evaluation(false, skipped = false, feedback = wrongTips.ifBlank { DefaultTips.FlashWrong }, result = FirstAnswerResult.Wrong)
         }
     }
 
-    private fun skipTips(card: CardEntity): String = when (card.type) {
-        CardType.FlashCard -> json.decodeFromString<FlashCardContent>(card.contentJson).skipTips
-        CardType.Mcq -> json.decodeFromString<McqContent>(card.contentJson).skipTips
-        CardType.Cloze -> json.decodeFromString<ClozeContent>(card.contentJson).skipTips
-        CardType.TypedAnswer -> json.decodeFromString<TypedAnswerContent>(card.contentJson).skipTips
-        else -> "已跳过，按答错处理。"
+    private fun wrongFeedback(card: CardEntity): String = when (card.type) {
+        CardType.FlashCard -> DefaultTips.FlashWrong
+        CardType.Mcq -> json.decodeFromString<McqContent>(card.contentJson).wrongTips.ifBlank { DefaultTips.FlashWrong }
+        CardType.Cloze -> json.decodeFromString<ClozeContent>(card.contentJson).wrongTips.ifBlank { DefaultTips.FlashWrong }
+        CardType.TypedAnswer -> json.decodeFromString<TypedAnswerContent>(card.contentJson).wrongTips.ifBlank { DefaultTips.FlashWrong }
+        else -> DefaultTips.FlashWrong
     }
 
     private fun getInternalTotal(n: Int): Int {
