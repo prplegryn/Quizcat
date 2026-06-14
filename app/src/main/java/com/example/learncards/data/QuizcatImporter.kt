@@ -112,6 +112,7 @@ class QuizcatImporter {
                 return@forEachIndexed
             }
 
+            val itemTime = now + index
             val safeLearning = requireNotNull(learningObj)
             val safeMcq = requireNotNull(mcqObj)
             val safeCloze = requireNotNull(clozeObj)
@@ -120,8 +121,8 @@ class QuizcatImporter {
             items += ItemEntity(
                 itemId = itemId,
                 term = term,
-                createdAt = now,
-                updatedAt = now,
+                createdAt = itemTime,
+                updatedAt = itemTime,
             )
 
             val learningContent = LearningContent(
@@ -162,11 +163,11 @@ class QuizcatImporter {
                 skipTips = safeTyped.str("skip_tips").ifBlank { DefaultTips.TypedSkip },
             )
 
-            cards += card(itemId, CardType.Learning, false, json.encodeToString(learningContent), now)
-            cards += card(itemId, CardType.FlashCard, true, json.encodeToString(flashContent), now)
-            cards += card(itemId, CardType.Mcq, true, json.encodeToString(mcqContent), now)
-            cards += card(itemId, CardType.Cloze, true, json.encodeToString(clozeContent), now)
-            cards += card(itemId, CardType.TypedAnswer, true, json.encodeToString(typedContent), now)
+            cards += card(itemId, CardType.Learning, false, json.encodeToString(learningContent), itemTime)
+            cards += card(itemId, CardType.FlashCard, true, json.encodeToString(flashContent), itemTime)
+            cards += card(itemId, CardType.Mcq, true, json.encodeToString(mcqContent), itemTime)
+            cards += card(itemId, CardType.Cloze, true, json.encodeToString(clozeContent), itemTime)
+            cards += card(itemId, CardType.TypedAnswer, true, json.encodeToString(typedContent), itemTime)
         }
 
         return ImportPreview(items = items, cards = cards, errors = errors)

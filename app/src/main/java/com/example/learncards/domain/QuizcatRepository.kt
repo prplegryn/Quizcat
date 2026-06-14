@@ -86,7 +86,7 @@ class QuizcatRepository(
             ?.decodeIds()
             ?.firstOrNull { it !in learningCompleted }
         val currentProgress = if (currentLearningId == null) {
-            progress.firstOrNull { it.status != ProgressStatus.Completed }
+            chooseNextProgress(progress)
         } else {
             null
         }
@@ -176,7 +176,7 @@ class QuizcatRepository(
                 }
             }
 
-            val scoringIds = scoringSources.keys.toList()
+            val scoringIds = buildScoringOrder(cardsById, scoringSources)
             val n = scoringIds.size
             if (n == 0) return@withTransaction null
 
@@ -200,8 +200,9 @@ class QuizcatRepository(
             )
             dao.insertSession(session)
             dao.insertProgress(
-                scoringIds.mapNotNull { cardId ->
-                    val card = cardsById[cardId] ?: return@mapNotNull null
+                scoringIds.mapIndexedNotNull { index, cardId ->
+                    val card = cardsById[cardId] ?: return@mapIndexedNotNull null
+                    val rowTime = now + index
                     DailyCardProgressEntity(
                         progressId = UUID.randomUUID().toString(),
                         sessionId = session.sessionId,
@@ -219,8 +220,8 @@ class QuizcatRepository(
                         firstAnswerResult = FirstAnswerResult.None,
                         lastFeedback = "",
                         source = scoringSources.getValue(cardId),
-                        createdAt = now,
-                        updatedAt = now,
+                        createdAt = rowTime,
+                        updatedAt = rowTime,
                     )
                 },
             )
@@ -291,6 +292,71 @@ class QuizcatRepository(
     }
 
     fun settingsFlow() = settingsStore.settings
+
+    private fun chooseNextProgress(progress: List<DailyCardProgressEntity>): DailyCardProgressEntity? {
+        return progress
+            .asSequence()
+            .filter { it.status != ProgressStatus.Completed }
+            .sortedWith(
+                compareBy<DailyCardProgressEntity> { it.updatedAt }
+                    .thenBy { scoringTypeRank(it.cardType) }
+                    .thenBy { it.createdAt }
+                    .thenBy { it.itemId.toLongOrNull() ?: Long.MAX_VALUE }
+                    .thenBy { it.itemId }
+                    .thenBy { it.cardId },
+            )
+            .firstOrNull()
+    }
+
+    private fun buildScoringOrder(
+        cardsById: Map<String, CardEntity>,
+        scoringSources: Map<String, String>,
+    ): List<String> {
+        val scoringCards = scoringSources.keys.mapNotNull { cardsById[it] }
+        val orderedTypes = listOf(
+            CardType.FlashCard,
+            CardType.Mcq,
+            CardType.Cloze,
+            CardType.TypedAnswer,
+        )
+        val known = scoringCards
+            .filter { it.type in orderedTypes }
+            .sortedWith(
+                compareBy<CardEntity> { sourceRank(scoringSources[it.cardId]) }
+                    .thenBy { scoringTypeRank(it.type) }
+                    .thenBy { it.createdAt }
+                    .thenBy { it.itemId.toLongOrNull() ?: Long.MAX_VALUE }
+                    .thenBy { it.itemId }
+                    .thenBy { it.cardId },
+            )
+            .map { it.cardId }
+        val remaining = scoringCards
+            .filter { it.type !in orderedTypes }
+            .sortedWith(
+                compareBy<CardEntity> { sourceRank(scoringSources[it.cardId]) }
+                    .thenBy { it.createdAt }
+                    .thenBy { it.itemId.toLongOrNull() ?: Long.MAX_VALUE }
+                    .thenBy { it.itemId }
+                    .thenBy { it.cardId },
+            )
+            .map { it.cardId }
+        return (known + remaining).distinct()
+    }
+
+    private fun sourceRank(source: String?): Int = when (source) {
+        ProgressSource.OldNew -> 0
+        ProgressSource.OldDue -> 1
+        ProgressSource.New -> 2
+        else -> 3
+    }
+
+    private fun scoringTypeRank(type: String): Int = when (type) {
+        CardType.FlashCard -> 0
+        CardType.Mcq -> 1
+        CardType.Cloze -> 2
+        CardType.TypedAnswer -> 3
+        else -> 4
+    }
 
     private suspend fun refreshSessionScoreLocked(
         session: DailySessionEntity,

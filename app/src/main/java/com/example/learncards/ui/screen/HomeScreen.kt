@@ -397,38 +397,67 @@ private fun ActiveSession(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .offset { IntOffset(shake.value.roundToInt(), 0) }
-            .graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-            },
-    ) {
-        if (state.settings.animationsEnabled) {
-            AnimatedContent(
-                targetState = card?.cardId,
-                transitionSpec = {
-                    (slideInHorizontally(animationSpec = tween(220)) { width -> width / 4 } + fadeIn(tween(220)))
-                        .togetherWith(slideOutHorizontally(animationSpec = tween(120)) { width -> -width / 4 } + fadeOut(tween(120)))
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AnimatedVisibility(state.feedbackText.isNotBlank()) {
+            FeedbackBanner(
+                text = state.feedbackText,
+                isCorrect = state.feedbackResult == FirstAnswerResult.Correct,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(shake.value.roundToInt(), 0) }
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
                 },
-                label = "card_switch",
-            ) { targetId ->
+        ) {
+            if (state.settings.animationsEnabled) {
+                AnimatedContent(
+                    targetState = card?.cardId,
+                    transitionSpec = {
+                        (slideInHorizontally(animationSpec = tween(220)) { width -> width / 4 } + fadeIn(tween(220)))
+                            .togetherWith(slideOutHorizontally(animationSpec = tween(120)) { width -> -width / 4 } + fadeOut(tween(120)))
+                    },
+                    label = "card_switch",
+                ) { targetId ->
+                    CardBody(
+                        card = card?.takeIf { it.cardId == targetId },
+                        progress = state.currentProgress,
+                        onCompleteLearning = onCompleteLearning,
+                        onAnswer = onAnswer,
+                    )
+                }
+            } else {
                 CardBody(
-                    card = card?.takeIf { it.cardId == targetId },
+                    card = card,
                     progress = state.currentProgress,
                     onCompleteLearning = onCompleteLearning,
                     onAnswer = onAnswer,
                 )
             }
-        } else {
-            CardBody(
-                card = card,
-                progress = state.currentProgress,
-                onCompleteLearning = onCompleteLearning,
-                onAnswer = onAnswer,
-            )
         }
+    }
+}
+
+@Composable
+private fun FeedbackBanner(text: String, isCorrect: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = if (isCorrect) {
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f)
+        } else {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+        },
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 

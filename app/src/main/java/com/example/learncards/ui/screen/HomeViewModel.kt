@@ -37,6 +37,7 @@ data class HomeUiState(
     val isBusy: Boolean = false,
     val feedbackNonce: Int = 0,
     val feedbackResult: String = "",
+    val feedbackText: String = "",
 )
 
 class HomeViewModel(
@@ -66,7 +67,7 @@ class HomeViewModel(
 
     fun generateToday() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isBusy = true, errorMessage = "") }
+            _uiState.update { it.copy(isBusy = true, errorMessage = "", feedbackText = "") }
             runCatching { repository.generateTodaySession() }
                 .onSuccess { refresh() }
                 .onFailure { error ->
@@ -80,7 +81,10 @@ class HomeViewModel(
         val sessionId = _uiState.value.session?.sessionId ?: return
         viewModelScope.launch {
             runCatching { repository.completeLearningCard(sessionId, cardId) }
-                .onSuccess { refresh() }
+                .onSuccess {
+                    _uiState.update { it.copy(feedbackText = "") }
+                    refresh()
+                }
                 .onFailure { error ->
                     _uiState.update { it.copy(errorMessage = error.message ?: "学习卡片更新失败") }
                 }
@@ -100,6 +104,7 @@ class HomeViewModel(
                         it.copy(
                             feedbackNonce = it.feedbackNonce + 1,
                             feedbackResult = outcome.result,
+                            feedbackText = outcome.feedback,
                         )
                     }
                 }
@@ -130,6 +135,7 @@ class HomeViewModel(
                             importText = "",
                             importPreview = null,
                             importMessage = "导入完成：成功 ${result.successCount}，错误 ${result.errorCount}",
+                            feedbackText = "",
                         )
                     }
                     refresh()
